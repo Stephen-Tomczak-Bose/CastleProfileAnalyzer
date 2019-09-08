@@ -29,7 +29,8 @@ private:
     time_t GetLogTime(const std::string &line);
 
 private:
-
+    static const int k_MapWidth;
+    
     struct MapData
     {
         unsigned long dataSize;

@@ -13,6 +13,8 @@
 #include <algorithm>
 #include "Profiler.h"
 
+const int Profiler::k_MapWidth = 150;
+
 Profiler::Profiler(const std::string &logfile)
 {
     m_file.open(logfile.c_str(), std::fstream::in);
@@ -98,7 +100,7 @@ void Profiler::Parse()
 
 //            std::cout << "LogTime: " << logTime << " avg.log: " << avg.log << std::endl;
             if(avg.log == logTime)
-            {
+            {                
                 avg.dataSize = (avg.dataSize + dataSize) / 2;
                 avg.time = (avg.time + uSec) / 2;
             }
@@ -203,10 +205,13 @@ void Profiler::Map()
     time_t endTime = m_profile[m_profile.size()-1].log;
     time_t startTime = m_profile[0].log;
 
-    std::cout << "startTime: " << startTime << " endTime: " << endTime << std::endl;
+    //std::cout << "startTime: " << startTime << " endTime: " << endTime << std::endl;
 
-    ss << "ClockTime |-------------------------------> Processing Time" << std::endl;
-
+    ss << std::endl;
+    ss << "ClockTime | Processing Time" << std::endl;
+    ss << "__________|" << std::setfill('_') << std::setw(k_MapWidth) << "_" << std::endl;
+    
+    
     for(int t = startTime; t <= endTime; ++t)
     {
         if(t == m_profile[y].log)
@@ -219,9 +224,9 @@ void Profiler::Map()
             float scale = m_profile[y].time / 50000;
             float yVal = round(scale);
 
-            if(yVal > 70)
+            if(yVal > k_MapWidth)
             {
-                yVal = 70;
+                yVal = k_MapWidth;
             }
             
             ss << std::setfill('-') << std::setw(yVal) << ">" << std::endl;
@@ -233,8 +238,9 @@ void Profiler::Map()
         // }
     }
 
-    ss << "          |" << std::setfill('_') << std::setw(70) << "_" << std::endl;
-    std::cout << ss.str();
+    ss << "          |" << std::setfill('_') << std::setw(k_MapWidth) << "_" << std::endl;
+    std::cout << ss.str() << std::endl << std::endl << std::endl;
+
 }
 
 
