@@ -26,7 +26,7 @@ public:
     void Map();
 
 private:
-    int GetLogTime(const std::string &line, struct tm &time);
+    time_t GetLogTime(const std::string &line);
 
 private:
 
@@ -34,13 +34,13 @@ private:
     {
         unsigned long dataSize;
         time_t        time;
-        struct tm     log;
+        time_t        log;
 
         MapData() { Reset(); };
         void Reset() {
             dataSize = 0;
             time = 0;
-            memset((char *)&log, 0, sizeof(struct tm));
+            log = 0;
         };
     };
 
@@ -48,7 +48,7 @@ private:
     std::vector<MapData> m_profile;
     std::fstream m_file;
     std::vector<std::string> m_months;
-    unsigned int m_year;
+    const struct tm *m_timeInfo;
 };
 
 #endif /* PROFILER_H_ */

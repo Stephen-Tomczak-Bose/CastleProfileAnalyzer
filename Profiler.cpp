@@ -5,6 +5,7 @@
  *      Author: st1016431
  */
 
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -27,7 +28,9 @@ Profiler::Profiler(const std::string &logfile)
     m_months.push_back("Sep");
     m_months.push_back("Nov");
     m_months.push_back("Dec");
-    m_year = 2019;
+
+    time_t rawtime = time(NULL);
+    m_timeInfo = localtime(&rawtime);
 }
 
 Profiler::~Profiler()
@@ -47,7 +50,7 @@ void Profiler::Parse()
     {
         unsigned int epos, pos = 0;
 
- //       std::cout << "Read Line: " << line << std::endl;
+//        std::cout << "Read Line: " << line << std::endl;
 
         if((std::string::npos != line.find("Profiler")) &&
            (std::string::npos != (pos = line.find("ProvideData") ) ) &&
@@ -55,10 +58,10 @@ void Profiler::Parse()
         {
 //            std::cout << "Found 'ProvideData' at " << pos << std::endl;
 
-            struct tm logTime;
-            if(GetLogTime(line, logTime) != 0)
+            time_t logTime = GetLogTime(line);
+            if(logTime == 0)
             {
-                continue;
+                 continue;
             }
 
             // Find the data size.
@@ -91,43 +94,50 @@ void Profiler::Parse()
             }
             uSec += strtoul(line.substr(pos, epos - pos).c_str(), NULL, 10);
 
-            std::cout << "Log " << logTime.tm_hour << ":" << logTime.tm_min << ":" << logTime.tm_sec
-                      << " DataSize: " << dataSize << " Time(uSec): " << uSec << std::endl;
+            //std::cout << "Log " << logTime << " DataSize: " << dataSize << " Time(uSec): " << uSec << std::endl;
 
-            if(avg.log.tm_hour == logTime.tm_hour ||
-               avg.log.tm_min == logTime.tm_min ||
-               avg.log.tm_sec == logTime.tm_sec )
+//            std::cout << "LogTime: " << logTime << " avg.log: " << avg.log << std::endl;
+            if(avg.log == logTime)
             {
                 avg.dataSize = (avg.dataSize + dataSize) / 2;
                 avg.time = (avg.time + uSec) / 2;
             }
             else
             {
-                m_profile.push_back(avg);
+                // skip the first one.
+                if(avg.log > 0)
+//                if(avg.dataSize > 0 && avg.time > 0)
+                {
+//                    std::cout << "Log " << avg.log << " DataSize: " << avg.dataSize << " Time(uSec): " << avg.time << std::endl;
+                    m_profile.push_back(avg);
+                }
+
+                // Start a new average.
                 avg.dataSize = dataSize;
                 avg.time = uSec;
-                avg.log.tm_hour = logTime.tm_hour;
-                avg.log.tm_min  = logTime.tm_min;
-                avg.log.tm_sec  = logTime.tm_sec;
+                avg.log = logTime;
             }
         }
-        else
-        {
-            std::cout << "Skipping..." << std::endl;
-        }
+        // else
+        // {
+        //     std::cout << "Skipping..." << std::endl;
+        // }
+    }
 
-        if(avg.dataSize > 0 && avg.time > 0)
-        {
-            m_profile.push_back(avg);
-        }
+    if(avg.dataSize > 0 && avg.time > 0)
+    {
+//        std::cout << "Log " << avg.log << " DataSize: " << avg.dataSize << " Time(uSec): " << avg.time << std::endl;
+        m_profile.push_back(avg);
     }
 }
 
-int Profiler::GetLogTime(const std::string &line, struct tm &time)
+time_t Profiler::GetLogTime(const std::string &line)
 {
+    time_t logTime = 0;
+    struct tm time;
+    memcpy((char *)&time, m_timeInfo, sizeof(struct tm));
+    
     // 638:Sep  6 07:36:54 ......
-
-    int rc = -1;
     unsigned int pos = line.find(":");        // Skip Log id
 
     if(std::string::npos != pos && pos < line.size())
@@ -157,7 +167,7 @@ int Profiler::GetLogTime(const std::string &line, struct tm &time)
     }
 
     // Hardcode the year for now.
-    time.tm_year = m_year;
+//    time.tm_year = m_year;
     
     if(std::string::npos != pos)
     {
@@ -175,10 +185,14 @@ int Profiler::GetLogTime(const std::string &line, struct tm &time)
 //            std::cout << "Minute is " << time.tm_min << std::endl;
             time.tm_sec = strtoul(line.substr(pos + 1, 2).c_str(), NULL, 10);
 //            std::cout << "Second is " << time.tm_sec << std::endl;
-            rc = 0;
+
+//            std::cout << "Time before: " << asctime(&time) << std::endl;
+            logTime = mktime(&time);
+//            std::cout << "Time after: " << asctime(&time) << " (" << logTime << ")" << std::endl;
+
         }
     }
-    return rc;
+    return logTime;
 }
 
 
@@ -186,8 +200,8 @@ void Profiler::Map()
 {
     std::stringstream ss;
     int    y = 0;
-    time_t endTime = mktime(&m_profile[m_profile.size()-1].log);
-    time_t startTime = mktime(&m_profile[0].log);
+    time_t endTime = m_profile[m_profile.size()-1].log;
+    time_t startTime = m_profile[0].log;
 
     std::cout << "startTime: " << startTime << " endTime: " << endTime << std::endl;
 
@@ -195,19 +209,28 @@ void Profiler::Map()
 
     for(int t = startTime; t <= endTime; ++t)
     {
-        if(t != mktime(&m_profile[y].log))
+        if(t == m_profile[y].log)
         {
-            ss << "          |";
-        }
-        else
-        {
-            ss << std::setw(2) << std::left << m_profile[y].log.tm_hour << ":"
-                << std::setw(2)  << std::left << m_profile[y].log.tm_min << ":"
-                << std::setw(2)  << std::left << m_profile[y].log.tm_sec << "  |";
+            // ss << std::setw(2) << std::left << m_profile[y].log.tm_hour << ":"
+            //     << std::setw(2)  << std::left << m_profile[y].log.tm_min << ":"
+            //     << std::setw(2)  << std::left << m_profile[y].log.tm_sec << "  |";
+            ss << std::setfill(' ') << std::setw(10) << std::right << m_profile[y].time << "|";
 
-            ss << std::setfill('-') << std::setw(m_profile[y].time / 70) << ">" << std::endl;
+            float scale = m_profile[y].time / 50000;
+            float yVal = round(scale);
+
+            if(yVal > 70)
+            {
+                yVal = 70;
+            }
+            
+            ss << std::setfill('-') << std::setw(yVal) << ">" << std::endl;
             ++y;
         }
+        // else
+        // {
+        //     ss << "          |" << std::endl;
+        // }
     }
 
     ss << "          |" << std::setfill('_') << std::setw(70) << "_" << std::endl;
